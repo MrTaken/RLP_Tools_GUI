@@ -112,7 +112,7 @@ class add_new_strings(QThread):
             f.close()
 
             del pottext[:5]
-            pottext[0:0]=rustext[:20]
+            pottext[0:0]=rustext[:19]
 
             for ind, line in enumerate(pottext):
                 if line[:2] == '#.':
