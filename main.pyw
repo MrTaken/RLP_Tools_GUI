@@ -113,13 +113,14 @@ class add_new_strings(QThread):
 
             del pottext[:5]
             pottext[0:0]=rustext[:19]
-
+            lastline=0
             for ind, line in enumerate(pottext):
                 if line[:2] == '#.':
                     self.progress.emit(int(ind*100/len(pottext)))
-                    for ind1, line1 in enumerate(rustext):
-                        if line==line1:
-                            pottext[ind+3]=rustext[ind1+3]
+                    for x in range(lastline,len(rustext)):
+                        if line==rustext[x]:
+                            pottext[ind+3]=rustext[x+3]
+                            lastline=x+5
                             break
 
 
