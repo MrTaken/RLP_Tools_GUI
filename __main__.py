@@ -1,24 +1,24 @@
 import sys
 import os
 from pathlib import Path
-try:
-  import PyQt5
-except:
-    import pip
-    pip.main(['install', '--user', 'PyQt5'])
-    import PyQt5
+
+import PyQt5
 
 from PyQt5 import uic
 from PyQt5.QtCore import *
 from PyQt5.QtWidgets import *
+import PyQt5.QtWidgets
 import sys
-
+from shutil import copyfile
 import zipfile
 import io
 import winreg
+import subprocess
 
+
+os.chdir(os.path.dirname(__file__))
 #Преобразуем ui шаблон в python код на лету
-f = open("form.py", "w", encoding="utf-8")
+f = open(os.path.join(os.path.dirname(__file__), r'form.py'), "w", encoding="utf-8")
 uic.compileUi(os.path.join(os.path.dirname(__file__), r'form.ui'), f)
 f.close()
 
@@ -28,18 +28,19 @@ def write_error_log(e):
     logf = open('error.log', 'w',encoding="utf-8")
     logf.write(str(e))
     logf.close()
+    print(str(e))
     sys.exit(1)
 
 
 def get_reg(name):
-    # try:
-    registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 322330", 0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
-    value, regtype = winreg.QueryValueEx(registry_key, name)
-    winreg.CloseKey(registry_key)
-    return value
-    # except Exception as e:
-    #     write_error_log(e)
-    #     return None
+    try:
+        registry_key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 322330", 0, winreg.KEY_READ|winreg.KEY_WOW64_64KEY)
+        value, regtype = winreg.QueryValueEx(registry_key, name)
+        winreg.CloseKey(registry_key)
+        return value
+    except Exception as e:
+        write_error_log(e)
+        return None
 
 def check_file(str):
     my_file = Path(str)
@@ -113,18 +114,21 @@ class add_new_strings(QThread):
 
             del pottext[:5]
             pottext[0:0]=rustext[:19]
-
+            lastline=0
             for ind, line in enumerate(pottext):
                 if line[:2] == '#.':
                     self.progress.emit(int(ind*100/len(pottext)))
-                    for ind1, line1 in enumerate(rustext):
-                        if line==line1:
-                            pottext[ind+3]=rustext[ind1+3]
+
+                    for x in range(lastline,len(rustext)):
+                        if line==rustext[x]:
+                            pottext[ind+3]=rustext[x+3]
+                            lastline=x+5
                             break
 
 
 
             self.progress.emit(100)
+            pottext.extend(rustext[lastline:len(rustext)])
             # f.seek(0, 2)  # go to the end of file
             f = io.open(self.DSTpo_path, encoding='utf-8', mode='w')
             for lines in pottext:
@@ -142,17 +146,28 @@ class ExampleApp(PyQt5.QtWidgets.QMainWindow, form.Ui_MainWindow):
         self.setupUi(self)  # Это нужно для инициализации нашего дизайна
         self.setFixedSize(self.size())
         dst_path=get_reg("InstallLocation")
+
         self.stringspo_path=None
         self.DSTpo_path=None
         # dst_path="D:\SteamLibrary\steamapps\common\Don't Starve Together"
         if dst_path:
             self.DSTpo_path = os.path.join(os.path.dirname(__file__), r'DST.po')
+            
+            try:
+                my_abs_path = self.DSTpo_path.resolve()
+            except Exception as e:
+                tmppath=dst_path+r"\mods\workshop-1240565842\DST.po"
+                check_file(tmppath)
+                copyfile(tmppath, self.DSTpo_path)
             check_file(self.DSTpo_path)
             check_file(dst_path+r"\data\databundles\scripts.zip")
+            
             zscripts=zipfile.ZipFile(dst_path+r"\data\databundles\scripts.zip",'r')
-            zscripts.extract(r"scripts/languages/strings.pot")
+            zscripts.extract(r"scripts/languages/strings.pot",path=os.path.dirname(__file__))
             zscripts.close()
-            self.stringspo_path = os.path.join(os.path.dirname(__file__), r'scripts\languages\strings.pot')
+            
+            self.stringspo_path = (os.path.dirname(__file__)+ r'\scripts\languages\strings.pot')
+            
             check_file(self.stringspo_path)
             self.count_empty()
             # self.plainTextEdit.appendPlainText("Путь до папки с игрой: " + dst_path)
@@ -162,6 +177,7 @@ class ExampleApp(PyQt5.QtWidgets.QMainWindow, form.Ui_MainWindow):
             self.pushButton3.clicked.connect(self.save_empty_strings)
             self.pushButton2.clicked.connect(self.merge_files)
             self.pushButton4.clicked.connect(self.check_struct)
+            subprocess.Popen('explorer "'+os.path.dirname(__file__)+'"')
         else:
             write_error_log(Exception("Не найден ключ реестра"))
 
